@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#000000" />
+  <title>メモリビュアー</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- ヘッダー（ロゴ + メニュー） -->
+  <header class="header">
+    <!--
+      ★ ロゴ画像
+         title_logo.jpg を index.html と同じ階層に配置してください。
+         サイズは css/style.css の .header__logo { height } で調整できます。
+    -->
+    <img src="title_logo.jpg" alt="メモリビュアー" class="header__logo" />
+
+    <button class="header__menu-btn" id="menu-btn" aria-label="メニュー">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+  </header>
+
+  <!-- フィード（縦スクロールコンテナ） -->
+  <div class="feed-viewport">
+    <div class="feed-container" id="feed-container">
+      <!-- スライドはJavaScriptで動的に生成されます -->
+    </div>
+  </div>
+
+  <!-- 設定パネル -->
+  <aside class="settings-panel" id="settings-panel">
+    <h2>⚙ 設定</h2>
+
+    <section>
+      <h2>データ管理</h2>
+      <p class="note">
+        LocalStorageにデータを保存しています。<br>
+        PCを買い替える際はエクスポートしてください。
+      </p>
+      <button class="settings-btn" id="btn-export">📥 データをエクスポート（JSON）</button>
+      <br><br>
+      <button class="settings-btn" id="btn-import">📤 データをインポート（JSON）</button>
+      <input type="file" id="import-input" accept=".json" />
+    </section>
+  </aside>
+
+  <!-- ===============================================
+       JS読み込み順序（依存関係があるため順番厳守）
+       =============================================== -->
+  <script src="js/config.js"></script>     <!-- ① 設定（最初に読む） -->
+  <script src="js/storage.js"></script>    <!-- ② LocalStorageラッパー -->
+  <script src="js/kenBurns.js"></script>   <!-- ③ 写真アニメーション -->
+  <script src="js/mediaPlayer.js"></script><!-- ④ 動画・写真制御 -->
+  <script src="js/feed.js"></script>       <!-- ⑤ スワイプフィード -->
+  <script src="js/app.js"></script>        <!-- ⑥ 初期化（最後に読む） -->
+
+</body>
+</html>

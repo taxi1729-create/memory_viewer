@@ -1,0 +1,297 @@
+/**
+ * style.css - メモリビュアー スタイルシート
+ * ============================================================
+ * ★ デザイン微調整は :root の CSS変数ブロックから行ってください。
+ * ============================================================
+ */
+
+/* ===========================================================
+   ★ CSS変数（デザイン微調整の入口）
+   =========================================================== */
+:root {
+  /* 色 */
+  --color-bg:              #000000;
+  --color-text:            rgba(255, 255, 255, 0.85);
+  --color-text-sub:        rgba(255, 255, 255, 0.55);
+  --color-heart-active:    #ff6b8a;
+  --color-seekbar-track:   rgba(255, 255, 255, 0.25);
+  --color-seekbar-fill:    rgba(255, 255, 255, 0.85);
+
+  /* フォント */
+  --font-main: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'HelveticaNeue', sans-serif;
+
+  /* フィード遷移 */
+  --transition-feed: 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+  /* UIオーバーレイ */
+  --overlay-blur: blur(8px);
+  --overlay-bg:   rgba(0, 0, 0, 0.35);
+}
+
+/* ===========================================================
+   リセット・ベース
+   =========================================================== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-main);
+  -webkit-font-smoothing: antialiased;
+  touch-action: none;  /* ページスクロールを防ぐ */
+}
+
+/* ===========================================================
+   ヘッダー（ロゴ + メニュー）
+   =========================================================== */
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.header__logo {
+  height: 32px;         /* ★ロゴサイズ調整箇所 */
+  object-fit: contain;
+  pointer-events: auto;
+}
+
+.header__menu-btn {
+  pointer-events: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 4px;
+}
+
+.header__menu-btn span {
+  display: block;
+  width: 22px;
+  height: 1.5px;
+  background: var(--color-text);
+  border-radius: 2px;
+  transition: opacity 0.2s;
+}
+
+/* ===========================================================
+   フィード
+   =========================================================== */
+.feed-viewport {
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  position: relative;
+}
+
+.feed-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  will-change: transform;
+}
+
+/* ===========================================================
+   スライド共通
+   =========================================================== */
+.slide {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+}
+
+/* ===========================================================
+   動画スライド
+   =========================================================== */
+.slide--video video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ===========================================================
+   写真スライド
+   =========================================================== */
+.slide--photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform-origin: center center;
+  will-change: transform;
+}
+
+/* ===========================================================
+   再生/停止アイコン
+   =========================================================== */
+.play-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 48px;
+  color: rgba(255,255,255,0.9);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+}
+
+.play-icon--visible {
+  opacity: 1;
+}
+
+/* ===========================================================
+   撮影メタ情報（左下）
+   =========================================================== */
+.slide-meta {
+  position: absolute;
+  bottom: 64px;  /* シークバーの上 */
+  left: 16px;
+  pointer-events: none;
+}
+
+.slide-meta__location {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-text);
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+}
+
+.slide-meta__date {
+  font-size: 12px;
+  color: var(--color-text-sub);
+  letter-spacing: 0.06em;
+  line-height: 1.4;
+}
+
+/* ===========================================================
+   ハートボタン（右下）
+   =========================================================== */
+.heart-btn {
+  position: absolute;
+  bottom: 52px;   /* シークバー上 */
+  right: 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 28px;
+  color: var(--color-text);
+  line-height: 1;
+  transition: color 0.2s ease;
+  will-change: transform;
+}
+
+.heart-btn--active {
+  color: var(--color-heart-active);
+}
+
+/* ===========================================================
+   シークバー（動画のみ / 画面下部）
+   =========================================================== */
+.seekbar-wrap {
+  position: absolute;
+  bottom: 24px;
+  left: 16px;
+  right: 60px;  /* ハートボタン分の余白 */
+  height: 20px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.seekbar-track {
+  width: 100%;
+  height: 2px;   /* ★シークバーの太さ */
+  background: var(--color-seekbar-track);
+  border-radius: 2px;
+  position: relative;
+}
+
+.seekbar-progress {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: var(--color-seekbar-fill);
+  border-radius: 2px;
+  pointer-events: none;
+  transition: width 0.1s linear;
+}
+
+/* ===========================================================
+   設定パネル（スライドイン）
+   =========================================================== */
+.settings-panel {
+  position: fixed;
+  top: 0;
+  right: -320px;
+  width: 300px;
+  height: 100dvh;
+  z-index: 200;
+  background: rgba(10, 10, 10, 0.92);
+  backdrop-filter: var(--overlay-blur);
+  -webkit-backdrop-filter: var(--overlay-blur);
+  padding: 60px 24px 40px;
+  transition: right 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settings-panel--open {
+  right: 0;
+}
+
+.settings-panel h2 {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-text);
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+
+.settings-panel p.note {
+  font-size: 12px;
+  color: var(--color-text-sub);
+  line-height: 1.7;
+}
+
+.settings-btn {
+  width: 100%;
+  padding: 12px 0;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  color: var(--color-text);
+  font-size: 14px;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: background 0.2s;
+}
+
+.settings-btn:hover, .settings-btn:active {
+  background: rgba(255,255,255,0.15);
+}
+
+#import-input { display: none; }
