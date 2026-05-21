@@ -1,65 +1,916 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="theme-color" content="#000000" />
-  <title>メモリビュアー</title>
-  <link rel="stylesheet" href="css/style.css" />
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="theme-color" content="#000"/>
+<title>メモリビュアー</title>
+<style>
+/* ============================================================
+   RESET & BASE
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{
+  width:100%;height:100%;
+  background:#000;color:#fff;
+  font-family:'Hiragino Kaku Gothic ProN','Hiragino Sans','HelveticaNeue',sans-serif;
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+  user-select:none;-webkit-user-select:none;
+}
+button{background:none;border:none;cursor:pointer;color:inherit;font-family:inherit;}
+
+/* ============================================================
+   WELCOME SCREEN
+   ============================================================ */
+#welcome{
+  position:fixed;inset:0;z-index:500;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  background:#000;
+  gap:0;
+  transition:opacity .6s ease, visibility .6s ease;
+}
+#welcome.hidden{opacity:0;visibility:hidden;pointer-events:none;}
+
+.welcome-logo{
+  width:140px;height:140px;
+  object-fit:contain;
+  margin-bottom:28px;
+  border-radius:28px;
+  /* ロゴがない場合のフォールバック表示 */
+}
+.welcome-logo-fallback{
+  width:140px;height:140px;
+  border-radius:28px;
+  background:linear-gradient(135deg,#1a1a1a 0%,#2a2a2a 100%);
+  border:1px solid rgba(255,255,255,.1);
+  display:flex;align-items:center;justify-content:center;
+  font-size:56px;
+  margin-bottom:28px;
+}
+.welcome-title{
+  font-size:22px;font-weight:300;
+  letter-spacing:.15em;
+  color:rgba(255,255,255,.9);
+  margin-bottom:8px;
+}
+.welcome-sub{
+  font-size:12px;
+  color:rgba(255,255,255,.35);
+  letter-spacing:.08em;
+  margin-bottom:52px;
+}
+
+/* 写真・動画を選ぶボタン */
+.pick-area{
+  display:flex;flex-direction:column;
+  align-items:center;gap:14px;
+  width:100%;max-width:300px;
+  padding:0 24px;
+}
+.pick-btn{
+  width:100%;padding:16px 0;
+  border-radius:14px;
+  font-size:15px;letter-spacing:.06em;
+  font-weight:400;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  transition:transform .15s ease, background .2s;
+  -webkit-tap-highlight-color:transparent;
+}
+.pick-btn:active{transform:scale(.97);}
+.pick-btn--primary{
+  background:rgba(255,255,255,.12);
+  border:1px solid rgba(255,255,255,.18);
+  color:#fff;
+}
+.pick-btn--primary:hover{background:rgba(255,255,255,.18);}
+.pick-btn--ghost{
+  background:transparent;
+  color:rgba(255,255,255,.45);
+  font-size:13px;
+}
+.pick-hint{
+  font-size:11px;color:rgba(255,255,255,.25);
+  letter-spacing:.04em;text-align:center;
+  line-height:1.6;margin-top:4px;
+}
+
+/* ============================================================
+   FEED VIEWER
+   ============================================================ */
+#viewer{
+  position:fixed;inset:0;z-index:100;
+  overflow:hidden;
+  display:none;
+}
+#viewer.active{display:block;}
+
+/* スライドコンテナ（縦に並ぶ） */
+#feed{
+  position:absolute;
+  left:0;top:0;
+  width:100%;
+  will-change:transform;
+  transition:transform .38s cubic-bezier(.25,.46,.45,.94);
+}
+#feed.no-transition{transition:none!important;}
+
+/* 1枚のスライド */
+.slide{
+  position:relative;
+  width:100%;
+  height:100dvh;
+  overflow:hidden;
+  background:#000;
+  display:flex;align-items:center;justify-content:center;
+}
+
+/* 動画 */
+.slide video{
+  position:absolute;inset:0;
+  width:100%;height:100%;
+  object-fit:cover;
+  display:block;
+}
+
+/* 写真 */
+.slide img.media-img{
+  position:absolute;inset:0;
+  width:100%;height:100%;
+  object-fit:cover;
+  display:block;
+  transform-origin:center center;
+  will-change:transform;
+}
+
+/* Ken Burns CSS アニメーション */
+@keyframes kb-zoom-tl{
+  0%  {transform:scale(1)   translate(0%,0%);}
+  100%{transform:scale(1.08) translate(.8%,.5%);}
+}
+@keyframes kb-zoom-tr{
+  0%  {transform:scale(1)   translate(0%,0%);}
+  100%{transform:scale(1.08) translate(-.8%,.5%);}
+}
+@keyframes kb-zoom-c{
+  0%  {transform:scale(1)   translate(0%,0%);}
+  100%{transform:scale(1.07) translate(0%,-.4%);}
+}
+.kb-tl{animation:kb-zoom-tl 8s ease-in-out infinite alternate;}
+.kb-tr{animation:kb-zoom-tr 8s ease-in-out infinite alternate;}
+.kb-c {animation:kb-zoom-c  8s ease-in-out infinite alternate;}
+
+/* ============================================================
+   UI OVERLAY
+   ============================================================ */
+/* 上部グラデーション */
+.slide-gradient-top{
+  position:absolute;top:0;left:0;right:0;
+  height:120px;
+  background:linear-gradient(to bottom,rgba(0,0,0,.55) 0%,transparent 100%);
+  pointer-events:none;z-index:10;
+}
+/* 下部グラデーション */
+.slide-gradient-bottom{
+  position:absolute;bottom:0;left:0;right:0;
+  height:180px;
+  background:linear-gradient(to top,rgba(0,0,0,.7) 0%,transparent 100%);
+  pointer-events:none;z-index:10;
+}
+
+/* ============================================================
+   META INFO（左下）
+   ============================================================ */
+.slide-meta{
+  position:absolute;
+  bottom:72px;left:18px;
+  z-index:20;pointer-events:none;
+}
+.slide-meta__name{
+  font-size:13px;font-weight:400;
+  color:rgba(255,255,255,.82);
+  letter-spacing:.04em;line-height:1.5;
+  max-width:220px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.slide-meta__date{
+  font-size:11px;color:rgba(255,255,255,.5);
+  letter-spacing:.06em;margin-top:2px;
+}
+.slide-meta__type{
+  font-size:10px;color:rgba(255,255,255,.3);
+  letter-spacing:.1em;text-transform:uppercase;
+  margin-top:1px;
+}
+
+/* ============================================================
+   HEART（右下）
+   ============================================================ */
+.heart-btn{
+  position:absolute;
+  bottom:68px;right:16px;
+  z-index:20;
+  width:44px;height:44px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:26px;
+  color:rgba(255,255,255,.7);
+  -webkit-tap-highlight-color:transparent;
+  transition:transform .25s cubic-bezier(.34,1.56,.64,1);
+}
+.heart-btn.active{color:#ff6b8a;}
+.heart-btn:active{transform:scale(.88);}
+
+/* ============================================================
+   SEEKBAR（動画のみ / 下部）
+   ============================================================ */
+.seekbar{
+  position:absolute;
+  bottom:32px;left:18px;right:62px;
+  z-index:20;
+  height:20px;display:flex;align-items:center;
+  cursor:pointer;touch-action:none;
+}
+.seekbar-track{
+  width:100%;height:2px;
+  background:rgba(255,255,255,.22);
+  border-radius:2px;position:relative;
+}
+.seekbar-fill{
+  position:absolute;left:0;top:0;height:100%;
+  background:rgba(255,255,255,.8);
+  border-radius:2px;
+  pointer-events:none;
+  transition:width .1s linear;
+}
+/* 写真のとき非表示 */
+.slide--photo .seekbar{display:none;}
+
+/* ============================================================
+   PLAY / PAUSE ICON（中央フラッシュ）
+   ============================================================ */
+.play-flash{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%) scale(.6);
+  z-index:30;
+  font-size:52px;
+  color:rgba(255,255,255,.9);
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .12s ease, transform .12s ease;
+  filter:drop-shadow(0 2px 16px rgba(0,0,0,.5));
+}
+.play-flash.show{
+  opacity:1;transform:translate(-50%,-50%) scale(1);
+}
+
+/* ============================================================
+   DURATION BADGE（動画右上）
+   ============================================================ */
+.duration-badge{
+  position:absolute;top:56px;right:16px;
+  z-index:20;
+  font-size:11px;
+  color:rgba(255,255,255,.5);
+  letter-spacing:.06em;
+  background:rgba(0,0,0,.3);
+  padding:3px 8px;border-radius:20px;
+  pointer-events:none;
+}
+
+/* ============================================================
+   HEADER（ロゴ）
+   ============================================================ */
+#hdr{
+  position:fixed;
+  top:0;left:0;right:0;
+  z-index:200;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:env(safe-area-inset-top,12px) 16px 0;
+  pointer-events:none;
+}
+#hdr-logo{height:30px;object-fit:contain;pointer-events:auto;}
+#hdr-logo-fallback{
+  font-size:15px;font-weight:300;
+  letter-spacing:.1em;color:rgba(255,255,255,.7);
+  pointer-events:auto;padding-top:14px;
+}
+
+/* 追加ボタン（右上） */
+#btn-add{
+  pointer-events:auto;
+  margin-top:14px;
+  width:36px;height:36px;
+  border-radius:50%;
+  background:rgba(255,255,255,.1);
+  border:1px solid rgba(255,255,255,.15);
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;
+  color:rgba(255,255,255,.8);
+  -webkit-tap-highlight-color:transparent;
+  transition:background .2s;
+}
+#btn-add:active{background:rgba(255,255,255,.2);}
+
+/* ============================================================
+   COUNTER（右上 スライド番号）
+   ============================================================ */
+#counter{
+  position:fixed;
+  top:env(safe-area-inset-top,14px);
+  left:50%;transform:translateX(-50%);
+  margin-top:14px;
+  z-index:201;
+  font-size:12px;color:rgba(255,255,255,.35);
+  letter-spacing:.08em;
+  pointer-events:none;
+}
+
+/* ============================================================
+   LOADING INDICATOR
+   ============================================================ */
+#loading{
+  position:fixed;inset:0;z-index:600;
+  background:rgba(0,0,0,.7);
+  display:none;align-items:center;justify-content:center;
+  flex-direction:column;gap:16px;
+  color:rgba(255,255,255,.6);
+  font-size:13px;letter-spacing:.08em;
+}
+#loading.show{display:flex;}
+.spinner{
+  width:32px;height:32px;
+  border:2px solid rgba(255,255,255,.15);
+  border-top-color:rgba(255,255,255,.7);
+  border-radius:50%;
+  animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ============================================================
+   EMPTY STATE
+   ============================================================ */
+#empty{
+  position:fixed;inset:0;z-index:150;
+  display:none;align-items:center;justify-content:center;
+  flex-direction:column;gap:16px;
+  background:#000;
+  color:rgba(255,255,255,.3);
+  font-size:14px;letter-spacing:.06em;
+  text-align:center;
+}
+#empty.show{display:flex;}
+#empty .e-icon{font-size:48px;margin-bottom:8px;opacity:.4;}
+.e-pick-btn{
+  margin-top:12px;
+  padding:13px 28px;
+  border-radius:24px;
+  background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.14);
+  color:rgba(255,255,255,.6);
+  font-size:14px;
+  letter-spacing:.06em;
+  -webkit-tap-highlight-color:transparent;
+  transition:background .2s;
+}
+.e-pick-btn:active{background:rgba(255,255,255,.16);}
+
+/* ============================================================
+   FILE INPUT（非表示）
+   ============================================================ */
+#file-input{display:none;}
+</style>
 </head>
 <body>
 
-  <!-- ヘッダー（ロゴ + メニュー） -->
-  <header class="header">
-    <!--
-      ★ ロゴ画像
-         title_logo.jpg を index.html と同じ階層に配置してください。
-         サイズは css/style.css の .header__logo { height } で調整できます。
-    -->
-    <img src="title_logo.jpg" alt="メモリビュアー" class="header__logo" />
+<!-- ============================================================
+     WELCOME SCREEN
+     ============================================================ -->
+<div id="welcome">
+  <!-- title_logo.jpg があれば表示、なければ絵文字フォールバック -->
+  <img src="title_logo.jpg" class="welcome-logo" id="logo-img" alt="メモリビュアー"
+       onerror="this.style.display='none';document.getElementById('logo-fallback').style.display='flex'"/>
+  <div class="welcome-logo-fallback" id="logo-fallback" style="display:none">📷</div>
 
-    <button class="header__menu-btn" id="menu-btn" aria-label="メニュー">
-      <span></span>
-      <span></span>
-      <span></span>
+  <p class="welcome-title">メモリビュアー</p>
+  <p class="welcome-sub">memory viewer</p>
+
+  <div class="pick-area">
+    <button class="pick-btn pick-btn--primary" id="btn-pick-welcome">
+      <span>＋</span> 写真・動画を選ぶ
     </button>
-  </header>
-
-  <!-- フィード（縦スクロールコンテナ） -->
-  <div class="feed-viewport">
-    <div class="feed-container" id="feed-container">
-      <!-- スライドはJavaScriptで動的に生成されます -->
-    </div>
+    <p class="pick-hint">
+      iOSの場合：「写真を選択」→ 複数選択可能です<br>
+      動画は30秒以内のものが対象です
+    </p>
   </div>
+</div>
 
-  <!-- 設定パネル -->
-  <aside class="settings-panel" id="settings-panel">
-    <h2>⚙ 設定</h2>
+<!-- ============================================================
+     HEADER（ビューア表示中）
+     ============================================================ -->
+<header id="hdr">
+  <img src="title_logo.jpg" id="hdr-logo" alt="メモリビュアー"
+       onerror="this.style.display='none';document.getElementById('hdr-logo-fallback').style.display='block'"/>
+  <span id="hdr-logo-fallback" style="display:none">メモリビュアー</span>
+  <button id="btn-add" title="写真・動画を追加">＋</button>
+</header>
 
-    <section>
-      <h2>データ管理</h2>
-      <p class="note">
-        LocalStorageにデータを保存しています。<br>
-        PCを買い替える際はエクスポートしてください。
-      </p>
-      <button class="settings-btn" id="btn-export">📥 データをエクスポート（JSON）</button>
-      <br><br>
-      <button class="settings-btn" id="btn-import">📤 データをインポート（JSON）</button>
-      <input type="file" id="import-input" accept=".json" />
-    </section>
-  </aside>
+<div id="counter"></div>
 
-  <!-- ===============================================
-       JS読み込み順序（依存関係があるため順番厳守）
-       =============================================== -->
-  <script src="js/config.js"></script>     <!-- ① 設定（最初に読む） -->
-  <script src="js/storage.js"></script>    <!-- ② LocalStorageラッパー -->
-  <script src="js/kenBurns.js"></script>   <!-- ③ 写真アニメーション -->
-  <script src="js/mediaPlayer.js"></script><!-- ④ 動画・写真制御 -->
-  <script src="js/feed.js"></script>       <!-- ⑤ スワイプフィード -->
-  <script src="js/app.js"></script>        <!-- ⑥ 初期化（最後に読む） -->
+<!-- ============================================================
+     FEED VIEWER
+     ============================================================ -->
+<div id="viewer">
+  <div id="feed"></div>
+</div>
 
+<!-- ============================================================
+     EMPTY STATE
+     ============================================================ -->
+<div id="empty">
+  <div class="e-icon">🌄</div>
+  <p>写真・動画がありません</p>
+  <button class="e-pick-btn" id="btn-pick-empty">写真・動画を選ぶ</button>
+</div>
+
+<!-- ============================================================
+     LOADING
+     ============================================================ -->
+<div id="loading">
+  <div class="spinner"></div>
+  <span>読み込み中…</span>
+</div>
+
+<!-- ============================================================
+     FILE INPUT（非表示）accept で写真+動画 -->
+<input type="file" id="file-input"
+       accept="image/*,video/*"
+       multiple/>
+
+<!-- ============================================================
+     JAVASCRIPT
+     ============================================================ -->
+<script>
+'use strict';
+
+/* ============================================================
+   CONFIG  ★ここを調整
+   ============================================================ */
+const CFG = {
+  SWIPE_THRESHOLD:      45,    // スワイプ感度 (px)
+  TRANSITION_MS:        380,   // フィード遷移速度 (ms)
+  KB_SCALE:             1.08,  // Ken Burns ズーム倍率
+  KB_DURATION_MS:       8000,  // Ken Burns 速度 (ms)
+  ICON_FLASH_MS:        750,   // 再生/停止アイコン表示時間 (ms)
+  HEART_ANIM_MS:        300,   // ハートアニメーション (ms)
+  MAX_VIDEO_SEC:        30,    // 動画の最大秒数（これ以上はスキップ）
+  HEART_COLOR:          '#ff6b8a',
+};
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let mediaItems  = [];   // {id, type, url, name, date}
+let currentIdx  = 0;
+let touchStartY = 0;
+let isDragging  = false;
+let heartSet    = new Set(JSON.parse(localStorage.getItem('mv_hearts') || '[]'));
+
+/* ============================================================
+   DOM REFS
+   ============================================================ */
+const $welcome   = document.getElementById('welcome');
+const $viewer    = document.getElementById('viewer');
+const $feed      = document.getElementById('feed');
+const $empty     = document.getElementById('empty');
+const $loading   = document.getElementById('loading');
+const $counter   = document.getElementById('counter');
+const $fileInput = document.getElementById('file-input');
+
+/* ============================================================
+   FILE PICKER
+   ============================================================ */
+function openPicker(){
+  $fileInput.value = '';
+  $fileInput.click();
+}
+
+$fileInput.addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files || []);
+  if(!files.length) return;
+  await loadFiles(files);
+});
+
+document.getElementById('btn-pick-welcome').addEventListener('click', openPicker);
+document.getElementById('btn-add').addEventListener('click', openPicker);
+document.getElementById('btn-pick-empty').addEventListener('click', openPicker);
+
+/* ============================================================
+   FILE LOADING
+   ============================================================ */
+async function loadFiles(files){
+  showLoading(true);
+
+  const validFiles = [];
+  for(const f of files){
+    const isImage = f.type.startsWith('image/');
+    const isVideo = f.type.startsWith('video/');
+    if(!isImage && !isVideo) continue;
+
+    if(isVideo){
+      // 動画は30秒チェック（duration取得）
+      try{
+        const dur = await getVideoDuration(f);
+        if(dur > CFG.MAX_VIDEO_SEC){
+          console.warn(`スキップ: ${f.name} (${Math.round(dur)}秒 > ${CFG.MAX_VIDEO_SEC}秒)`);
+          continue;
+        }
+      } catch(_){ /* durationが取れない場合は通過 */ }
+    }
+    validFiles.push(f);
+  }
+
+  // 既存URLを解放してから新しいURL生成
+  const newItems = validFiles.map(f => {
+    const url  = URL.createObjectURL(f);
+    const date = f.lastModified
+      ? new Date(f.lastModified).toLocaleDateString('ja-JP',
+          {year:'numeric',month:'2-digit',day:'2-digit'})
+          .replace(/\//g,'.')
+      : '';
+    return {
+      id:   `mv_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      type: f.type.startsWith('video/') ? 'video' : 'photo',
+      url,
+      name: f.name.replace(/\.[^/.]+$/,''),  // 拡張子除去
+      date,
+    };
+  });
+
+  showLoading(false);
+
+  if(!newItems.length){
+    alert(`有効なファイルがありませんでした。\n・30秒以内の動画\n・写真 を選んでください。`);
+    return;
+  }
+
+  // 追加 or リセット
+  const isFirst = mediaItems.length === 0;
+  mediaItems = [...mediaItems, ...newItems];
+
+  if(isFirst){
+    buildFeed();
+    showViewer();
+  } else {
+    // 追加分のスライドを末尾に足す
+    newItems.forEach(item => {
+      $feed.appendChild(createSlide(item));
+    });
+    updateCounter();
+  }
+}
+
+function getVideoDuration(file){
+  return new Promise((resolve, reject) => {
+    const v = document.createElement('video');
+    v.preload = 'metadata';
+    v.src = URL.createObjectURL(file);
+    v.onloadedmetadata = () => {
+      URL.revokeObjectURL(v.src);
+      resolve(v.duration);
+    };
+    v.onerror = reject;
+    setTimeout(reject, 5000);  // タイムアウト
+  });
+}
+
+/* ============================================================
+   BUILD FEED
+   ============================================================ */
+function buildFeed(){
+  $feed.innerHTML = '';
+  $feed.style.transform = 'translateY(0)';
+  currentIdx = 0;
+
+  mediaItems.forEach(item => {
+    $feed.appendChild(createSlide(item));
+  });
+
+  // 最初のスライドをアクティブに
+  activateSlide(0);
+  updateCounter();
+}
+
+function createSlide(item){
+  const slide = document.createElement('div');
+  slide.className = `slide slide--${item.type}`;
+  slide.dataset.id = item.id;
+
+  // グラデーション
+  const gt = document.createElement('div');
+  gt.className = 'slide-gradient-top';
+  const gb = document.createElement('div');
+  gb.className = 'slide-gradient-bottom';
+  slide.appendChild(gt);
+  slide.appendChild(gb);
+
+  if(item.type === 'video'){
+    buildVideoSlide(slide, item);
+  } else {
+    buildPhotoSlide(slide, item);
+  }
+
+  // META（左下）
+  const meta = document.createElement('div');
+  meta.className = 'slide-meta';
+  const nm = document.createElement('p');
+  nm.className = 'slide-meta__name';
+  nm.textContent = item.name;
+  const dt = document.createElement('p');
+  dt.className = 'slide-meta__date';
+  dt.textContent = item.date;
+  const tp = document.createElement('p');
+  tp.className = 'slide-meta__type';
+  tp.textContent = item.type === 'video' ? 'VIDEO' : 'PHOTO';
+  meta.append(nm, dt, tp);
+  slide.appendChild(meta);
+
+  // HEART（右下）
+  const hb = document.createElement('button');
+  hb.className = 'heart-btn' + (heartSet.has(item.id) ? ' active' : '');
+  hb.setAttribute('aria-label','ハート');
+  hb.innerHTML = heartSet.has(item.id) ? '♥' : '♡';
+  hb.addEventListener('click', e => {
+    e.stopPropagation();
+    toggleHeart(item.id, hb);
+  });
+  slide.appendChild(hb);
+
+  return slide;
+}
+
+/* ============================================================
+   VIDEO SLIDE
+   ============================================================ */
+function buildVideoSlide(slide, item){
+  const video = document.createElement('video');
+  video.src    = item.url;
+  video.loop   = true;
+  video.muted  = true;
+  video.playsInline = true;
+  video.preload = 'metadata';
+  video.setAttribute('playsinline','');
+  video.setAttribute('webkit-playsinline','');
+  slide.appendChild(video);
+
+  // Duration badge
+  const badge = document.createElement('div');
+  badge.className = 'duration-badge';
+  video.addEventListener('loadedmetadata', () => {
+    badge.textContent = formatTime(video.duration);
+  });
+  slide.appendChild(badge);
+
+  // Play/Pause flash icon
+  const flash = document.createElement('div');
+  flash.className = 'play-flash';
+  flash.textContent = '▶';
+  slide.appendChild(flash);
+
+  // Tap to play/pause
+  video.addEventListener('click', () => togglePlay(video, flash));
+
+  // Seekbar
+  const seekbar  = document.createElement('div');
+  seekbar.className = 'seekbar';
+  const track    = document.createElement('div');
+  track.className = 'seekbar-track';
+  const fill     = document.createElement('div');
+  fill.className = 'seekbar-fill';
+  fill.style.width = '0%';
+  track.appendChild(fill);
+  seekbar.appendChild(track);
+  slide.appendChild(seekbar);
+
+  video.addEventListener('timeupdate', () => {
+    if(!video.duration) return;
+    fill.style.width = (video.currentTime / video.duration * 100) + '%';
+  });
+
+  // Seekbar drag
+  bindSeek(seekbar, track, video);
+}
+
+function togglePlay(video, flash){
+  if(video.paused){
+    video.play().catch(()=>{});
+    showFlash(flash, '▶');
+  } else {
+    video.pause();
+    showFlash(flash, '⏸');
+  }
+}
+
+function showFlash(el, icon){
+  el.textContent = icon;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), CFG.ICON_FLASH_MS);
+}
+
+function bindSeek(seekbar, track, video){
+  const seek = (clientX) => {
+    const r = track.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+    if(video.duration) video.currentTime = pct * video.duration;
+  };
+  seekbar.addEventListener('touchstart', e => {
+    e.stopPropagation();
+    seek(e.touches[0].clientX);
+  }, {passive:true});
+  seekbar.addEventListener('touchmove', e => {
+    e.stopPropagation();
+    seek(e.touches[0].clientX);
+  }, {passive:true});
+  seekbar.addEventListener('mousedown', e => {
+    e.stopPropagation();
+    seek(e.clientX);
+    const mv = ev => seek(ev.clientX);
+    const up = () => { document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); };
+    document.addEventListener('mousemove', mv);
+    document.addEventListener('mouseup', up);
+  });
+}
+
+function formatTime(s){
+  const m = Math.floor(s/60);
+  const sec = Math.floor(s%60);
+  return `${m}:${String(sec).padStart(2,'0')}`;
+}
+
+/* ============================================================
+   PHOTO SLIDE（Ken Burns）
+   ============================================================ */
+const KB_CLASSES = ['kb-tl','kb-tr','kb-c'];
+
+function buildPhotoSlide(slide, item){
+  const img = document.createElement('img');
+  img.className = 'media-img';
+  img.src = item.url;
+  img.alt = item.name;
+  img.draggable = false;
+  slide.appendChild(img);
+  // Ken Burns クラスはactivateSlide時に付与
+}
+
+/* ============================================================
+   SLIDE ACTIVATION / DEACTIVATION
+   ============================================================ */
+function activateSlide(idx){
+  const slides = $feed.querySelectorAll('.slide');
+  if(!slides[idx]) return;
+  const slide = slides[idx];
+
+  // 動画：再生
+  const video = slide.querySelector('video');
+  if(video){
+    video.currentTime = 0;
+    video.play().catch(()=>{});
+  }
+
+  // 写真：Ken Burns
+  const img = slide.querySelector('img.media-img');
+  if(img){
+    // クラスをリセットしてランダム付与
+    img.classList.remove(...KB_CLASSES);
+    void img.offsetWidth; // reflow でアニメーションリセット
+    img.classList.add(KB_CLASSES[Math.floor(Math.random() * KB_CLASSES.length)]);
+  }
+}
+
+function deactivateSlide(idx){
+  const slides = $feed.querySelectorAll('.slide');
+  if(!slides[idx]) return;
+  const slide = slides[idx];
+
+  const video = slide.querySelector('video');
+  if(video) video.pause();
+
+  const img = slide.querySelector('img.media-img');
+  if(img) img.classList.remove(...KB_CLASSES);
+}
+
+/* ============================================================
+   SWIPE / NAVIGATION
+   ============================================================ */
+function goTo(idx, animate=true){
+  const max = mediaItems.length - 1;
+  if(idx < 0 || idx > max) return;
+
+  deactivateSlide(currentIdx);
+
+  if(!animate){
+    $feed.classList.add('no-transition');
+  } else {
+    $feed.classList.remove('no-transition');
+  }
+
+  $feed.style.transform = `translateY(calc(-${idx} * 100dvh))`;
+  currentIdx = idx;
+
+  activateSlide(currentIdx);
+  updateCounter();
+
+  if(!animate){
+    // 次フレームで transition を戻す
+    requestAnimationFrame(() => $feed.classList.remove('no-transition'));
+  }
+}
+
+// Touch swipe
+const $vp = document.getElementById('viewer');
+$vp.addEventListener('touchstart', e => {
+  touchStartY = e.touches[0].clientY;
+  isDragging  = true;
+}, {passive:true});
+
+$vp.addEventListener('touchend', e => {
+  if(!isDragging) return;
+  isDragging = false;
+  const diff = touchStartY - e.changedTouches[0].clientY;
+  if(diff >  CFG.SWIPE_THRESHOLD) goTo(currentIdx + 1);
+  if(diff < -CFG.SWIPE_THRESHOLD) goTo(currentIdx - 1);
+}, {passive:true});
+
+// Mouse wheel（PCデバッグ用）
+let wheelLock = false;
+$vp.addEventListener('wheel', e => {
+  if(wheelLock) return;
+  wheelLock = true;
+  setTimeout(() => { wheelLock = false; }, CFG.TRANSITION_MS + 80);
+  if(e.deltaY > 0) goTo(currentIdx + 1);
+  else             goTo(currentIdx - 1);
+}, {passive:true});
+
+// Keyboard（PCデバッグ用）
+document.addEventListener('keydown', e => {
+  if(e.key === 'ArrowDown') goTo(currentIdx + 1);
+  if(e.key === 'ArrowUp')   goTo(currentIdx - 1);
+});
+
+/* ============================================================
+   HEART
+   ============================================================ */
+function toggleHeart(id, btn){
+  const on = heartSet.has(id);
+  if(on){
+    heartSet.delete(id);
+    btn.innerHTML = '♡';
+    btn.classList.remove('active');
+  } else {
+    heartSet.add(id);
+    btn.innerHTML = '♥';
+    btn.classList.add('active');
+  }
+  // アニメーション
+  btn.style.transition = `transform ${CFG.HEART_ANIM_MS}ms cubic-bezier(.34,1.56,.64,1)`;
+  btn.style.transform  = 'scale(1.4)';
+  setTimeout(() => { btn.style.transform = 'scale(1)'; }, CFG.HEART_ANIM_MS);
+
+  // LocalStorage 保存
+  localStorage.setItem('mv_hearts', JSON.stringify([...heartSet]));
+}
+
+/* ============================================================
+   UI HELPERS
+   ============================================================ */
+function showViewer(){
+  $welcome.classList.add('hidden');
+  $viewer.classList.add('active');
+  $empty.classList.remove('show');
+}
+
+function showLoading(v){
+  $loading.style.display = v ? 'flex' : 'none';
+}
+
+function updateCounter(){
+  if(mediaItems.length === 0){ $counter.textContent = ''; return; }
+  $counter.textContent = `${currentIdx + 1} / ${mediaItems.length}`;
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+(function init(){
+  // ビューアは最初非表示
+  $viewer.classList.remove('active');
+  $empty.classList.remove('show');
+  showLoading(false);
+})();
+</script>
 </body>
 </html>
